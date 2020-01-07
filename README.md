@@ -95,7 +95,7 @@ Teleconsultation applicable: False
 
 ## What is not covered here
 
-A real chatbot needs to handle multiple users. You need to have a database where you'd keep state of conversation
+A proper chatbot (check it out: https://symptomate.com/chatbot/) needs to handle multiple users. You need to have a database where you'd keep state of conversation
 with each user and have it updated each time an interaction takes place. Also, a real chatbot will need to handle
 events coming from external components (e.g. chatbot frontend or third-party platform such as Google Assistant),
 so the bot backend should probably be a REST app (e.g. made with Flask or UWSGI).
@@ -118,6 +118,6 @@ For legal reasons you may need to use higher age threshold, though.
 
 
 If you're developing a voice app or simple text-based chat, you cannot handle medical questions other than
-the simple ones (yes, no, don't-know). For such scenarios the `disable_groups` mode is intented (see `apiaccess.py`).
+the simple ones (yes, no, don't-know). For such scenarios the `disable_groups` mode is intended (see `apiaccess.py`).
 If your chatbot is more of a rich conversational UI, then you may as well support all of the question types and not
 need this mode.

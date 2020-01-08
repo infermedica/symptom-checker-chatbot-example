@@ -57,28 +57,22 @@ def read_input(prompt):
     return sys.stdin.readline().strip()
 
 
-def read_age_sex(given_age=None, given_sex=None):
-    """Primitive routine for reading age and sex specification such as "30 male" unless age and sex already given.
-    This is very crude and lame. This is because reading answers to simple questions is not the main scope of this
+def read_age_sex():
+    """Primitive routine for reading age and sex specification such as "30 male".
+    This is very crude. This is because reading answers to simple questions is not the main scope of this
     example. In real chatbots, either use some real intent+slot recogniser such as snips_nlu,
     or at least write a number of regular expressions to capture most typical patterns for a given language.
     Also, age below 12 should be rejected as our current model doesn't support paediatrics
     (it's being developed but not delivered yet)."""
-    if given_age and given_sex:
-        return int(given_age), sex_norm[given_sex.lower()]
-
     agesex = read_input('Patient age and sex (e.g., 30 male)')
     age, sex = agesex.split()
     return int(age), sex_norm[sex.lower()]
 
 
-def read_complaint_portion(auth_string, case_id, context, given_story=None, model=None):
+def read_complaint_portion(auth_string, case_id, context, model=None):
     """Call the /parse endpoint of Infermedica API for the given message or have the user input the message beforehand.
     """
-    if given_story:
-        text = given_story
-    else:
-        text = read_input('Describe you complaints')
+    text = read_input('Describe you complaints')
     if not text:
         return None
     resp = apiaccess.ask_nlp(text, auth_string, case_id, context, model=model)
@@ -100,22 +94,20 @@ def summarise_mentions(mentions):
     print('Noting: {}'.format(', '.join(mention_as_text(m) for m in mentions)))
 
 
-def read_complaints(auth_string, case_id, given_story=None, model=None):
+def read_complaints(auth_string, case_id, model=None):
     """Keep reading complaint-describing messages from user until empty message read (or just read the story if given).
     Will call the /parse endpoint and return mentions captured there."""
     mentions = []
-    context = []
+    context = []  # a list of ids of present symptoms in the order of reporting
     while True:
-        portion = read_complaint_portion(auth_string, case_id, context, given_story, model=model)
+        portion = read_complaint_portion(auth_string, case_id, context, model=model)
         if portion:
             summarise_mentions(portion)
             mentions.extend(portion)
             # remember the mentions understood as context for next /parse calls
             context.extend(context_from_mentions(portion))
-            if mentions and given_story:
-                # assume it's all as it was given
-                return mentions
         if mentions and portion is None:
+            # user said there's nothing more but we've already got at least one complaint
             return mentions
 
 

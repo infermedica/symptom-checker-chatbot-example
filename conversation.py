@@ -62,20 +62,20 @@ def read_age_sex():
     This is very crude. This is because reading answers to simple questions is not the main scope of this
     example. In real chatbots, either use some real intent+slot recogniser such as snips_nlu,
     or at least write a number of regular expressions to capture most typical patterns for a given language.
-    Also, age below 12 should be rejected as our current model doesn't support paediatrics
+    Also, age below 12 should be rejected as our current knowledge doesn't support paediatrics
     (it's being developed but not delivered yet)."""
     agesex = read_input('Patient age and sex (e.g., 30 male)')
     age, sex = agesex.split()
     return int(age), sex_norm[sex.lower()]
 
 
-def read_complaint_portion(auth_string, case_id, context, model=None):
+def read_complaint_portion(auth_string, case_id, context, language_model=None):
     """Call the /parse endpoint of Infermedica API for the given message or have the user input the message beforehand.
     """
     text = read_input('Describe you complaints')
     if not text:
         return None
-    resp = apiaccess.ask_nlp(text, auth_string, case_id, context, model=model)
+    resp = apiaccess.ask_nlp(text, auth_string, case_id, context, language_model=language_model)
     return resp.get('mentions', [])
 
 
@@ -94,13 +94,13 @@ def summarise_mentions(mentions):
     print('Noting: {}'.format(', '.join(mention_as_text(m) for m in mentions)))
 
 
-def read_complaints(auth_string, case_id, model=None):
+def read_complaints(auth_string, case_id, language_model=None):
     """Keep reading complaint-describing messages from user until empty message read (or just read the story if given).
     Will call the /parse endpoint and return mentions captured there."""
     mentions = []
     context = []  # a list of ids of present symptoms in the order of reporting
     while True:
-        portion = read_complaint_portion(auth_string, case_id, context, model=model)
+        portion = read_complaint_portion(auth_string, case_id, context, language_model=language_model)
         if portion:
             summarise_mentions(portion)
             mentions.extend(portion)
@@ -147,31 +147,33 @@ def read_question_answer_iter(question_struct):
                     stop = True
 
 
-def conduct_interview(evidence, age, sex, case_id, auth, model=None):
+def conduct_interview(evidence, age, sex, case_id, auth, language_model=None):
     """Keep asking questions until API tells us to stop or the user gives an empty answer."""
     while True:
-        resp = apiaccess.call_diagnosis(evidence, age, sex, case_id, auth, model=model)
+        resp = apiaccess.call_diagnosis(evidence, age, sex, case_id, auth, language_model=language_model)
         question_struct = resp['question']
         diagnoses = resp['conditions']
         if resp['should_stop']:
-            triage_resp = apiaccess.call_triage(evidence, age, sex, case_id, auth, model=model)
+            triage_resp = apiaccess.call_triage(evidence, age, sex, case_id, auth, language_model=language_model)
             return evidence, diagnoses, triage_resp
         answers = list(read_question_answer_iter(question_struct))
         if not answers:
-            triage_resp = apiaccess.call_triage(evidence, age, sex, case_id, auth, model=model)
+            triage_resp = apiaccess.call_triage(evidence, age, sex, case_id, auth, language_model=language_model)
             return evidence, diagnoses, triage_resp
         else:
             # this is a very important step: always update the evidence gathered so far with the new answers
             evidence.extend(answers)
 
 
-def name_evidence(evidence, auth_string, case_id, model=None):
+def name_evidence(evidence, auth_string, case_id, language_model=None):
     # TODO: extract obtaining naming dict from API to a different method to be cached for some time
     # instead of asking /symptoms/ID, you can call /symptoms once and get metadata for all of them
     # this is what could be cached; remember to set some time-out to get updated metadata once in a while
     obs_structs = []
-    obs_structs.extend(apiaccess.call_endpoint('risk_factors', auth_string, None, case_id=case_id, model=model))
-    obs_structs.extend(apiaccess.call_endpoint('symptoms', auth_string, None, case_id=case_id, model=model))
+    obs_structs.extend(
+        apiaccess.call_endpoint('risk_factors', auth_string, None, case_id=case_id, language_model=language_model))
+    obs_structs.extend(
+        apiaccess.call_endpoint('symptoms', auth_string, None, case_id=case_id, language_model=language_model))
     naming = {struct['id']: struct['name'] for struct in obs_structs}
     for piece in evidence:
         piece['name'] = naming[piece['id']]

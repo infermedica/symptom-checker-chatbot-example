@@ -4,7 +4,7 @@ import requests
 infermedica_url = 'https://api.infermedica.com/v2/{}'
 
 
-def _remote_headers(auth_string, case_id, model=None):
+def _remote_headers(auth_string, case_id, language_model=None):
     app_id, app_key = auth_string.split(':')
     headers = {
         'Content-Type': 'application/json',
@@ -12,12 +12,12 @@ def _remote_headers(auth_string, case_id, model=None):
         'Interview-Id': case_id,
         'App-Id': app_id,
         'App-Key': app_key}
-    if model:
-        headers['Model'] = model
+    if language_model:
+        headers['Model'] = language_model
     return headers
 
 
-def call_diagnosis(evidence, age, sex, case_id, auth_string, no_groups=True, model=None):
+def call_diagnosis(evidence, age, sex, case_id, auth_string, no_groups=True, language_model=None):
     """Call the /diagnosis endpoint.
     Input: evidence and patient basic data (age and sex).
     Output:
@@ -40,10 +40,10 @@ def call_diagnosis(evidence, age, sex, case_id, auth_string, no_groups=True, mod
             'disable_groups': no_groups
         }
     }
-    return call_endpoint('diagnosis', auth_string, request_spec, case_id, model)
+    return call_endpoint('diagnosis', auth_string, request_spec, case_id, language_model)
 
 
-def call_triage(evidence, age, sex, case_id, auth_string, no_groups=True, model=None):
+def call_triage(evidence, age, sex, case_id, auth_string, no_groups=True, language_model=None):
     """Call the /triage endpoint.
     Input: evidence and patient basic data (age and sex).
     Output:
@@ -64,32 +64,35 @@ def call_triage(evidence, age, sex, case_id, auth_string, no_groups=True, model=
             'enable_triage_5': True,
         }
     }
-    return call_endpoint('triage', auth_string, request_spec, case_id, model)
+    return call_endpoint('triage', auth_string, request_spec, case_id, language_model)
 
 
-def ask_nlp(text, auth_string, case_id, context=(), conc_types=('symptom', 'risk_factor',), model=None):
+def ask_nlp(text, auth_string, case_id, context=(), conc_types=('symptom', 'risk_factor',), language_model=None):
     """Call Infermedica NLP API to have the user message (text) analysed and obtain a list of dicts, each
     representing one observation mention understood. Each of the mention refers to one concept (e.g. abdominal pain),
     its status/modality (present/absent/unknown) and some less important details.
     Context should be a list of strings, each string corresponding to a present observation reported so far,
     in the order of reporting. See https://developer.infermedica.com/docs/nlp (contextual clues)."""
     request_spec = {'text': text, 'context': list(context), 'include_tokens': True, 'concept_types': conc_types}
-    return call_endpoint('parse', auth_string, request_spec, case_id, model=model)
+    return call_endpoint('parse', auth_string, request_spec, case_id, language_model=language_model)
 
 
-def call_endpoint(endpoint, auth_string, request_spec, case_id, model=None):
+def call_endpoint(endpoint, auth_string, request_spec, case_id, language_model=None):
     if auth_string and ':' in auth_string:
         url = infermedica_url.format(endpoint)
-        headers = _remote_headers(auth_string, case_id, model)
+        headers = _remote_headers(auth_string, case_id, language_model)
     else:
         raise IOError('need App-Id:App-Key auth string')
-    if model:
-        # name of a model for a language other than the default English
+    if language_model:
+        # name of a model that designates a language and possibly a non-standard knowledge base
         # e.g. infermedica-es
-        # extract the language code in such cases
-        if '-' in model:
-            model = model.split('-')[-1]
-        headers['Language'] = model
+        # (the default model is infermedica-en)
+        # extract the language code if model name provided
+        if '-' in language_model:
+            lang_code = language_model.split('-')[-1]
+        else:
+            lang_code = language_model
+        headers['Language'] = lang_code
     if request_spec:
         resp = requests.post(
             url,

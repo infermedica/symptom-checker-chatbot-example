@@ -28,7 +28,7 @@ def new_case_id():
 def run():
     parser = argparse.ArgumentParser()
     parser.add_argument('auth', help='auth string for Infermedica API: app-id:app-key or filename with it')
-    parser.add_argument('--model', help='set given model')
+    parser.add_argument('--model', help='use non-standard Infermedica model/language (e.g., infermedica-es)')
     parser.add_argument(
         '-v', '--verbose', dest='verbose', action='store_true', default=False, help='dump internal state')
 

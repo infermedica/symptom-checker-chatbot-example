@@ -8,12 +8,21 @@ import conversation
 def get_auth_string(auth_or_path):
     if ':' in auth_or_path:
         return auth_or_path
-    with open(auth_or_path) as stream:
-        content = stream.read()
-    content = content.strip()
-    if ':' in content:
-        return content
+    try:
+        with open(auth_or_path) as stream:
+            content = stream.read()
+            content = content.strip()
+            if ':' in content:
+                return content
+    except FileNotFoundError:
+        pass
     raise ValueError(auth_or_path)
+
+
+def new_case_id():
+    """Generate an identifier unique to a new session.
+    This is not user id but an identifier that is generated anew with each started "visit" to the bot."""
+    return uuid.uuid4().hex
 
 
 def run():
@@ -28,13 +37,10 @@ def run():
 
     args = parser.parse_args()
 
-    # this should be an identifier unique to every session
-    # this is not user id but an identifier that is generated anew with each started "visit" to the bot
-    case_id = uuid.uuid4().hex
-
+    auth_string = get_auth_string(args.auth)
+    case_id = new_case_id()
     age, sex = conversation.read_age_sex(args.age, args.sex)
     print('Ok, {} year old {}.'.format(age, sex))
-    auth_string = get_auth_string(args.auth)
     mentions = conversation.read_complaints(auth_string, case_id, args.story, args.model)
     evidence = conversation.from_complaints(mentions)
     evidence, diagnoses, triage = conversation.conduct_interview(evidence, age, sex, case_id, auth_string, args.model)

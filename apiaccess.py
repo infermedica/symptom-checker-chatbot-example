@@ -95,7 +95,7 @@ def call_triage(evidence, age, sex, case_id, auth_string, language_model=None):
     return call_endpoint('triage', auth_string, request_spec, case_id, language_model)
 
 
-def ask_nlp(text, auth_string, case_id, context=(), conc_types=('symptom', 'risk_factor',), language_model=None):
+def call_parse(text, auth_string, case_id, context=(), conc_types=('symptom', 'risk_factor',), language_model=None):
     """Process the user message (text) via Infermedica NLP API (/parse) to capture observations mentioned there.
     Return a list of dicts, each of them representing one mention. A mention refers to one concept
     (e.g. abdominal pain), its status/modality (present/absent/unknown) + some additional details.
@@ -104,11 +104,6 @@ def ask_nlp(text, auth_string, case_id, context=(), conc_types=('symptom', 'risk
     in the order of reporting. See https://developer.infermedica.com/docs/nlp ("contextual clues")."""
     request_spec = {'text': text, 'context': list(context), 'include_tokens': True, 'concept_types': conc_types}
     return call_endpoint('parse', auth_string, request_spec, case_id, language_model=language_model)
-
-
-def mentions_to_evidence(mentions):
-    """Convert mentions (from /parse) to evidence structure as expected by the /diagnosis endpoint."""
-    return [{'id': m['id'], 'choice_id': m['choice_id'], 'initial': True} for m in mentions]
 
 
 def get_observation_names(auth_string, case_id, language_model=None):
@@ -127,3 +122,16 @@ def name_evidence(evidence, naming):
     """Add "name" field to each piece of evidence."""
     for piece in evidence:
         piece['name'] = naming[piece['id']]
+
+
+def mentions_to_evidence(mentions):
+    """Convert mentions (from /parse) to evidence structure as expected by the /diagnosis endpoint."""
+    return [{'id': m['id'], 'choice_id': m['choice_id'], 'initial': True} for m in mentions]
+
+
+def question_answer_to_evidence(question_struct_item, observation_value):
+    """Return new evidence obtained via abswering the one item contained in a question with the given observation
+    value (status)."""
+    # "initial" evidence comes from user's complaints
+    # other evidence should be marked as "initial": False
+    return [{'id': question_struct_item['id'], 'choice_id': observation_value, 'initial': False}]

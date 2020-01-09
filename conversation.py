@@ -75,7 +75,7 @@ def read_complaint_portion(auth_string, case_id, context, language_model=None):
     text = read_input('Describe you complaints')
     if not text:
         return None
-    resp = apiaccess.ask_nlp(text, auth_string, case_id, context, language_model=language_model)
+    resp = apiaccess.call_parse(text, auth_string, case_id, context, language_model=language_model)
     return resp.get('mentions', [])
 
 
@@ -111,35 +111,14 @@ def read_complaints(auth_string, case_id, language_model=None):
             return mentions
 
 
-def read_single_question_answer(qtext, qitem):
-    """Primitive implementation of understanding user's answer to a single-choice question."""
-    answer = read_input(qtext)
+def read_single_question_answer(question_text):
+    """Primitive implementation of understanding user's answer to a single-choice question.
+    Prompt the user with question text, read user's input and convert it to one of the expected
+    evidence statuses: present, absent or unknown. Return None if no answer provided."""
+    answer = read_input(question_text)
     if not answer:
         return None
-    val = answer_norm[answer]
-    return {'id': qitem['id'], 'choice_id': val, 'initial': False}
-
-
-def read_question_answer_iter(question_struct):
-    qtext = question_struct.get('text', 'id')
-    qtype = question_struct['type']
-    qitems = question_struct['items']
-    stop = False
-    if qtype == 'single':
-        assert len(qitems) == 1
-        here = read_single_question_answer(qtext, qitems[0])
-        if here:
-            yield here
-    else:
-        for qitem in qitems:
-            if not stop:
-                here = read_single_question_answer(qitem['name'], qitem)
-                if here:
-                    yield here
-                    if qtype == 'group_single' and here['choice_id'] == 'present':
-                        stop = True
-                else:
-                    stop = True
+    return answer_norm[answer]
 
 
 def conduct_interview(evidence, age, sex, case_id, auth, language_model=None):
@@ -150,11 +129,34 @@ def conduct_interview(evidence, age, sex, case_id, auth, language_model=None):
         diagnoses = resp['conditions']
         should_stop_now = resp['should_stop']
         if should_stop_now:
+            # triage recommendation must be obtained from a separate endpoint, call it now
+            # and return all the information together
             triage_resp = apiaccess.call_triage(evidence, age, sex, case_id, auth, language_model=language_model)
             return evidence, diagnoses, triage_resp
-        answers = list(read_question_answer_iter(question_struct))
+        new_evidence = []
+        if question_struct['type'] == 'single':
+            # if you're calling /diagnosis in "disable_groups" mode, you'll only get "single" questions
+            # these are simple questions that require a simple answer --
+            # whether the observation being asked for is present, absent or unknown
+            question_items = question_struct['items']
+            assert len(question_items) == 1  # this is a single question
+            question_item = question_items[0]
+            observation_value = read_single_question_answer(question_text=question_struct['text'])
+            if observation_value is not None:
+                new_evidence.extend(apiaccess.question_answer_to_evidence(question_item, observation_value))
+        else:
+            # You'd need a rich UI to handle group questions gracefully.
+            # There are two types of group questions: "group_single" (radio buttons)
+            # and "group_multiple" (a bunch of single questions gathered under one caption).
+            # Actually you can try asking sequentially for each question item from "group_multiple" question
+            # and then adding the evidence coming from all these answers.
+            # For "group_single" there should be only one present answer. It's recommended to include only this chosen
+            # answer as present symptom in the new evidence.
+            # For more details, please consult:
+            # https://developer.infermedica.com/docs/diagnosis#group_single
+            raise NotImplementedError('Group questions not handled in this example')
         # important: always update the evidence gathered so far with the new answers
-        evidence.extend(answers)
+        evidence.extend(new_evidence)
 
 
 def summarise_some_evidence(evidence, header):

@@ -111,11 +111,6 @@ def read_complaints(auth_string, case_id, language_model=None):
             return mentions
 
 
-def from_complaints(mentions):
-    """Convert mentions into the evidence structure expected by the /diagnosis endpoint."""
-    return [{'id': m['id'], 'choice_id': m['choice_id'], 'initial': True} for m in mentions]
-
-
 def read_single_question_answer(qtext, qitem):
     """Primitive implementation of understanding user's answer to a single-choice question."""
     answer = read_input(qtext)
@@ -163,20 +158,6 @@ def conduct_interview(evidence, age, sex, case_id, auth, language_model=None):
         else:
             # this is a very important step: always update the evidence gathered so far with the new answers
             evidence.extend(answers)
-
-
-def name_evidence(evidence, auth_string, case_id, language_model=None):
-    # TODO: extract obtaining naming dict from API to a different method to be cached for some time
-    # instead of asking /symptoms/ID, you can call /symptoms once and get metadata for all of them
-    # this is what could be cached; remember to set some time-out to get updated metadata once in a while
-    obs_structs = []
-    obs_structs.extend(
-        apiaccess.call_endpoint('risk_factors', auth_string, None, case_id=case_id, language_model=language_model))
-    obs_structs.extend(
-        apiaccess.call_endpoint('symptoms', auth_string, None, case_id=case_id, language_model=language_model))
-    naming = {struct['id']: struct['name'] for struct in obs_structs}
-    for piece in evidence:
-        piece['name'] = naming[piece['id']]
 
 
 def summarise_some_evidence(evidence, header):

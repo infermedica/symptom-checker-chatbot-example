@@ -103,3 +103,24 @@ def call_endpoint(endpoint, auth_string, request_spec, case_id, language_model=N
     resp.raise_for_status()
     return resp.json()
 
+
+def mentions_to_evidence(mentions):
+    """Convert mentions (from /parse) to evidence structure as expected by the /diagnosis endpoint."""
+    return [{'id': m['id'], 'choice_id': m['choice_id'], 'initial': True} for m in mentions]
+
+
+def get_observation_names(auth_string, case_id, language_model=None):
+    """Call /symptoms and /risk_factors to obtain full lists of all symptoms and risk factors along with their
+    metadata. Those metadata include names and this is what we're after. Observations may contain both symptoms
+    and risk factors. Their ids indicate concept type (symptoms are prefixed and p_ for"""
+    obs_structs = []
+    obs_structs.extend(
+        call_endpoint('risk_factors', auth_string, None, case_id=case_id, language_model=language_model))
+    obs_structs.extend(
+        call_endpoint('symptoms', auth_string, None, case_id=case_id, language_model=language_model))
+    return {struct['id']: struct['name'] for struct in obs_structs}
+
+
+def name_evidence(evidence, naming):
+    for piece in evidence:
+        piece['name'] = naming[piece['id']]

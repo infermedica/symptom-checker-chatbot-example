@@ -17,66 +17,6 @@ def _remote_headers(auth_string, case_id, language_model=None):
     return headers
 
 
-def call_diagnosis(evidence, age, sex, case_id, auth_string, no_groups=True, language_model=None):
-    """Call the /diagnosis endpoint.
-    Input: evidence and patient basic data (age and sex).
-    Output:
-    1. next question to be answered by the patient (differential diagnosis);
-    2. current outlook (list of diagnoses with probability estimates);
-    3. "stop now" flag -- if the diagnostic engine recommends to stop asking questions now and present
-    the current outlook as final results.
-
-    Use no_groups to turn off group questions (they may be both single-choice questions and multiple questions
-    gathered together under one subtitle; it's hard to handle such questions in voice-only chatbot).
-    """
-    request_spec = {
-        'age': age,
-        'sex': sex,
-        'evidence': evidence,
-        'extras': {
-            # this is to avoid very improbable diagnoses at output and ensure there are no more than 8 results
-            'enable_adaptive_ranking': True,
-            # voice/chat apps usually can't handle group questions well
-            'disable_groups': no_groups
-        }
-    }
-    return call_endpoint('diagnosis', auth_string, request_spec, case_id, language_model)
-
-
-def call_triage(evidence, age, sex, case_id, auth_string, no_groups=True, language_model=None):
-    """Call the /triage endpoint.
-    Input: evidence and patient basic data (age and sex).
-    Output:
-    1. next question to be answered by the patient (differential diagnosis);
-    2. current outlook (list of diagnoses with probability estimates);
-    3. "stop now" flag -- if the diagnostic engine recommends to stop asking questions now and present
-    the current outlook as final results.
-
-    Use no_groups to turn off group questions (they may be both single-choice questions and multiple questions
-    gathered together under one subtitle; it's hard to handle such questions in voice-only chatbot).
-    """
-    request_spec = {
-        'age': age,
-        'sex': sex,
-        'evidence': evidence,
-        'extras': {
-            # this is to turn on the 5-level triage (recommended in the API docs)
-            'enable_triage_5': True,
-        }
-    }
-    return call_endpoint('triage', auth_string, request_spec, case_id, language_model)
-
-
-def ask_nlp(text, auth_string, case_id, context=(), conc_types=('symptom', 'risk_factor',), language_model=None):
-    """Call Infermedica NLP API to have the user message (text) analysed and obtain a list of dicts, each
-    representing one observation mention understood. Each of the mention refers to one concept (e.g. abdominal pain),
-    its status/modality (present/absent/unknown) and some less important details.
-    Context should be a list of strings, each string corresponding to a present observation reported so far,
-    in the order of reporting. See https://developer.infermedica.com/docs/nlp (contextual clues)."""
-    request_spec = {'text': text, 'context': list(context), 'include_tokens': True, 'concept_types': conc_types}
-    return call_endpoint('parse', auth_string, request_spec, case_id, language_model=language_model)
-
-
 def call_endpoint(endpoint, auth_string, request_spec, case_id, language_model=None):
     if auth_string and ':' in auth_string:
         url = infermedica_url.format(endpoint)
@@ -104,6 +44,68 @@ def call_endpoint(endpoint, auth_string, request_spec, case_id, language_model=N
     return resp.json()
 
 
+def call_diagnosis(evidence, age, sex, case_id, auth_string, no_groups=True, language_model=None):
+    """Call the /diagnosis endpoint.
+    Input: evidence and patient basic data (age and sex).
+    Output:
+    1. next question to be answered by the patient (differential diagnosis);
+    2. current outlook (list of diagnoses with probability estimates);
+    3. "stop now" flag -- if the diagnostic engine recommends to stop asking questions now and present
+    the current outlook as final results.
+
+    Use no_groups to turn off group questions (they may be both single-choice questions and multiple questions
+    gathered together under one subtitle; it's hard to handle such questions in voice-only chatbot).
+    """
+    request_spec = {
+        'age': age,
+        'sex': sex,
+        'evidence': evidence,
+        'extras': {
+            # this is to avoid very improbable diagnoses at output and ensure there are no more than 8 results
+            # recommended to use for virtually any app, this should become the default mode soon
+            'enable_adaptive_ranking': True,
+            # voice/chat apps usually can't handle group questions well
+            'disable_groups': no_groups
+        }
+    }
+    return call_endpoint('diagnosis', auth_string, request_spec, case_id, language_model)
+
+
+def call_triage(evidence, age, sex, case_id, auth_string, language_model=None):
+    """Call the /triage endpoint.
+    Input: evidence and patient basic data (age and sex).
+    Output:
+    1. next question to be answered by the patient (differential diagnosis);
+    2. current outlook (list of diagnoses with probability estimates);
+    3. "stop now" flag -- if the diagnostic engine recommends to stop asking questions now and present
+    the current outlook as final results.
+
+    Use no_groups to turn off group questions (they may be both single-choice questions and multiple questions
+    gathered together under one subtitle; it's hard to handle such questions in voice-only chatbot).
+    """
+    request_spec = {
+        'age': age,
+        'sex': sex,
+        'evidence': evidence,
+        'extras': {
+            # this is to turn on the 5-level triage (recommended in the API docs)
+            'enable_triage_5': True,
+        }
+    }
+    return call_endpoint('triage', auth_string, request_spec, case_id, language_model)
+
+
+def ask_nlp(text, auth_string, case_id, context=(), conc_types=('symptom', 'risk_factor',), language_model=None):
+    """Process the user message (text) via Infermedica NLP API (/parse) to capture observations mentioned there.
+    Return a list of dicts, each of them representing one mention. A mention refers to one concept
+    (e.g. abdominal pain), its status/modality (present/absent/unknown) + some additional details.
+    Providing context of previously understood observations may help make sense of partial information in some cases.
+    Context should be a list of strings, each string being an id of a present observation reported so far,
+    in the order of reporting. See https://developer.infermedica.com/docs/nlp ("contextual clues")."""
+    request_spec = {'text': text, 'context': list(context), 'include_tokens': True, 'concept_types': conc_types}
+    return call_endpoint('parse', auth_string, request_spec, case_id, language_model=language_model)
+
+
 def mentions_to_evidence(mentions):
     """Convert mentions (from /parse) to evidence structure as expected by the /diagnosis endpoint."""
     return [{'id': m['id'], 'choice_id': m['choice_id'], 'initial': True} for m in mentions]
@@ -122,5 +124,6 @@ def get_observation_names(auth_string, case_id, language_model=None):
 
 
 def name_evidence(evidence, naming):
+    """Add "name" field to each piece of evidence."""
     for piece in evidence:
         piece['name'] = naming[piece['id']]

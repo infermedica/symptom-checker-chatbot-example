@@ -37,10 +37,6 @@ The interview will finish when the diagnostic API responds with a `should_stop` 
 This flag is raised when the engine reaches conclusion that enough is known or there have already been too many
 questions to bother the user further.
 
-This toy bot also allows you to finish earlier and see what the current outlook was. To do so, reply to a question
-with an empty string (just press enter). You'll see what the current hypotheses were, although these will have been
-based on incomplete knowledge and may well be unreliable.
-
 Below is an example session.
 
 ```

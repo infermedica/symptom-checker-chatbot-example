@@ -148,16 +148,13 @@ def conduct_interview(evidence, age, sex, case_id, auth, language_model=None):
         resp = apiaccess.call_diagnosis(evidence, age, sex, case_id, auth, language_model=language_model)
         question_struct = resp['question']
         diagnoses = resp['conditions']
-        if resp['should_stop']:
+        should_stop_now = resp['should_stop']
+        if should_stop_now:
             triage_resp = apiaccess.call_triage(evidence, age, sex, case_id, auth, language_model=language_model)
             return evidence, diagnoses, triage_resp
         answers = list(read_question_answer_iter(question_struct))
-        if not answers:
-            triage_resp = apiaccess.call_triage(evidence, age, sex, case_id, auth, language_model=language_model)
-            return evidence, diagnoses, triage_resp
-        else:
-            # this is a very important step: always update the evidence gathered so far with the new answers
-            evidence.extend(answers)
+        # important: always update the evidence gathered so far with the new answers
+        evidence.extend(answers)
 
 
 def summarise_some_evidence(evidence, header):

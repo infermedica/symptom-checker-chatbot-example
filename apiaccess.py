@@ -109,7 +109,7 @@ def call_parse(text, auth_string, case_id, context=(), conc_types=('symptom', 'r
 def get_observation_names(auth_string, case_id, language_model=None):
     """Call /symptoms and /risk_factors to obtain full lists of all symptoms and risk factors along with their
     metadata. Those metadata include names and this is what we're after. Observations may contain both symptoms
-    and risk factors. Their ids indicate concept type (symptoms are prefixed and p_ for"""
+    and risk factors. Their ids indicate concept type (symptoms are prefixed s_, risk factors -- p_)."""
     obs_structs = []
     obs_structs.extend(
         call_endpoint('risk_factors', auth_string, None, case_id=case_id, language_model=language_model))

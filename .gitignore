@@ -3,3 +3,6 @@ __pycache__/
 *$py.class
 
 .idea/
+.vscode/
+.env/
+.DS_Store

@@ -1,51 +1,7 @@
 import sys
 
 import apiaccess
-
-
-sex_norm = {
-    'male': 'male',
-    'm': 'male',
-    'man': 'male',
-    'female': 'female',
-    'f': 'female',
-    'woman': 'female',
-    'hombre': 'male',
-    'mujer': 'female',
-    'varón': 'male',
-    'varon': 'male',
-    'señor': 'male',
-    'senhor': 'male',
-    'senor': 'male',
-    'señora': 'female',
-    'senora': 'female',
-    'senhora': 'female',
-}
-
-
-answer_norm = {
-    'yes': 'present',
-    'y': 'present',
-    'present': 'present',
-    'no': 'absent',
-    'n': 'absent',
-    'absent': 'absent',
-    '?': 'unknown',
-    'skip': 'unknown',
-    'unknown': 'unknown',
-    'dont know': 'unknown',
-    'don\'t know': 'unknown',
-    'sí': 'present',
-    'si': 'present',
-    'no lo sé': 'unknown',
-    'no lo se': 'unknown',
-    'omitir': 'unknown',
-    'omita': 'unknown',
-    'salta': 'unknown',
-}
-
-
-modality_symbol = {'present': '+', 'absent': '-', 'unknown': '?'}
+import constants
 
 
 def read_input(prompt):
@@ -55,7 +11,7 @@ def read_input(prompt):
         prompt (str): String to be displayed.
 
     Returns:
-        str: Users input (stripped and projected to lower-case).
+        str: Stripped users input.
 
     """
     if prompt.endswith('?'):
@@ -63,7 +19,7 @@ def read_input(prompt):
     else:
         prompt = prompt + ': '
     print(prompt, end='', flush=True)
-    return sys.stdin.readline().strip().lower()
+    return sys.stdin.readline().strip()
 
 
 def read_age_sex():
@@ -77,101 +33,143 @@ def read_age_sex():
     support paediatrics (it's being developed but not delivered yet).
 
     Returns:
-        int, str: Tuple of age and sex.
+        int, str: Age and sex.
 
     """
     agesex = read_input("Patient age and sex (e.g., 30 male)")
     try:
         age, sex = agesex.split()
         age = int(age)
-        sex = sex_norm[sex]
-        if age < 12:
-            print("Ages below 12 are not yet handled.", end=' ')
+        sex = constants.SEX_NORM[sex.lower()]
+        if age < constants.MIN_AGE:
+            print("Ages below 12 are not yet supported.", end=' ')
             raise ValueError
-        if age > 130:
+        if age > constants.MAX_AGE:
             print("Maximum possible age is 130.", end=' ')
             raise ValueError
     except (ValueError, KeyError):
-        print("Invalid input. Please reenter.")
+        print("Invalid input, Please reenter.")
         age, sex = read_age_sex()
     return age, sex
 
 
 def read_complaint_portion(auth_string, case_id, context, language_model=None):
-    """Call the /parse endpoint of Infermedica API for the given message or have the user input the message beforehand.
+    """Reads user input and calls the /parse endpoint of Infermedica API to
+    extract conditions found in text.
+
+    Args:
+        auth_string (str): Authentication string.
+        case_id (str): Case ID.
+        context (list): List previous complaints.
+        lanugage_model (str): Chosen language model.
+
+    Returns:
+        dict: Response from /parse endpoint.
+
     """
     text = read_input('Describe you complaints')
     if not text:
         return None
-    resp = apiaccess.call_parse(text, auth_string, case_id, context, language_model=language_model)
+    resp = apiaccess.call_parse(text, auth_string, case_id, context,
+                                language_model=language_model)
     return resp.get('mentions', [])
 
 
 def mention_as_text(mention):
-    """Represent the given mention structure as simple textual summary."""
-    name = mention['name']
-    symbol = modality_symbol[mention['choice_id']]
-    return '{}{}'.format(symbol, name)
+    """Represent the given mention structure as simple textual summary.
+
+    Args:
+        mention (dict): Response containing information about medical concept.
+
+    Returns:
+        str: Formatted name of the reported medical concept, e.g. +Dizziness,
+            -Headache.
+
+    """
+    _modality_symbol = {"present": "+", "absent": "-", "unknown": "?"}
+    name = mention["name"]
+    symbol = _modality_symbol[mention["choice_id"]]
+    return "{}{}".format(symbol, name)
 
 
 def context_from_mentions(mentions):
+    """Returns IDs of medical concepts that are present."""
     return [m['id'] for m in mentions if m['choice_id'] == 'present']
 
 
 def summarise_mentions(mentions):
-    print('Noting: {}'.format(', '.join(mention_as_text(m) for m in mentions)))
+    """Prints noted mentions."""
+    print("Noting: {}".format(", ".join(mention_as_text(m) for m in mentions)))
 
 
 def read_complaints(auth_string, case_id, language_model=None):
-    """Keep reading complaint-describing messages from user until empty message read (or just read the story if given).
-    Will call the /parse endpoint and return mentions captured there."""
+    """Keeps reading complaint-describing messages from user until empty
+    message is read (or just read the story if given). Will call the /parse
+    endpoint and return mentions captured there.
+
+    Args:
+        auth_string (str): Authentication string.
+        case_id (str): Case ID.
+        lanugage_model (str): Chosen language model.
+
+    """
     mentions = []
-    context = []  # a list of ids of present symptoms in the order of reporting
+    context = []  # List of ids of present symptoms in the order of reporting.
     while True:
-        portion = read_complaint_portion(auth_string, case_id, context, language_model=language_model)
+        portion = read_complaint_portion(auth_string, case_id, context,
+                                         language_model=language_model)
         if portion:
             summarise_mentions(portion)
             mentions.extend(portion)
-            # remember the mentions understood as context for next /parse calls
+            # Remember the mentions understood as context for next /parse calls
             context.extend(context_from_mentions(portion))
         if mentions and portion is None:
-            # user said there's nothing more but we've already got at least one complaint
+            # User said there's nothing more but we've already got at least one
+            # complaint.
             return mentions
 
 
 def read_single_question_answer(question_text):
-    """Primitive implementation of understanding user's answer to a single-choice question.
-    Prompt the user with question text, read user's input and convert it to one of the expected
-    evidence statuses: present, absent or unknown. Return None if no answer provided."""
+    """Primitive implementation of understanding user's answer to a
+    single-choice question. Prompt the user with question text, read user's
+    input and convert it to one of the expected evidence statuses: present,
+    absent or unknown. Return None if no answer provided."""
     answer = read_input(question_text)
     if not answer:
         return None
-    return answer_norm[answer]
+    return constants.ANSWER_NORM[answer]
 
 
 def conduct_interview(evidence, age, sex, case_id, auth, language_model=None):
-    """Keep asking questions until API tells us to stop or the user gives an empty answer."""
+    """Keep asking questions until API tells us to stop or the user gives an
+    empty answer."""
     while True:
-        resp = apiaccess.call_diagnosis(evidence, age, sex, case_id, auth, language_model=language_model)
+        resp = apiaccess.call_diagnosis(evidence, age, sex, case_id, auth,
+                                        language_model=language_model)
         question_struct = resp['question']
         diagnoses = resp['conditions']
         should_stop_now = resp['should_stop']
         if should_stop_now:
-            # triage recommendation must be obtained from a separate endpoint, call it now
-            # and return all the information together
-            triage_resp = apiaccess.call_triage(evidence, age, sex, case_id, auth, language_model=language_model)
+            # Triage recommendation must be obtained from a separate endpoint,
+            # call it now and return all the information together.
+            triage_resp = apiaccess.call_triage(evidence, age, sex, case_id,
+                                                auth,
+                                                language_model=language_model)
             return evidence, diagnoses, triage_resp
         new_evidence = []
         if question_struct['type'] == 'single':
-            # if you're calling /diagnosis in "disable_groups" mode, you'll only get "single" questions
-            # these are simple questions that require a simple answer --
-            # whether the observation being asked for is present, absent or unknown
+            # If you're calling /diagnosis in "disable_groups" mode, you'll
+            # only get "single" questions. These are simple questions that
+            # require a simple answer -- whether the observation being asked
+            # for is present, absent or unknown.
             question_items = question_struct['items']
             assert len(question_items) == 1  # this is a single question
             question_item = question_items[0]
-            observation_value = read_single_question_answer(question_text=question_struct['text'])
+            observation_value = read_single_question_answer(
+                question_text=question_struct['text'])
             if observation_value is not None:
-                new_evidence.extend(apiaccess.question_answer_to_evidence(question_item, observation_value))
+                new_evidence.extend(apiaccess.question_answer_to_evidence(
+                    question_item, observation_value))
         else:
             # You'd need a rich UI to handle group questions gracefully.
             # There are two types of group questions: "group_single" (radio buttons)

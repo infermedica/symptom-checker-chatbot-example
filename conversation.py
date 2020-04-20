@@ -49,24 +49,52 @@ modality_symbol = {'present': '+', 'absent': '-', 'unknown': '?'}
 
 
 def read_input(prompt):
+    """Displays appropriate prompt and read the input.
+
+    Args:
+        prompt (str): String to be displayed.
+
+    Returns:
+        str: Users input (stripped and projected to lower-case).
+
+    """
     if prompt.endswith('?'):
         prompt = prompt + ' '
     else:
         prompt = prompt + ': '
     print(prompt, end='', flush=True)
-    return sys.stdin.readline().strip()
+    return sys.stdin.readline().strip().lower()
 
 
 def read_age_sex():
-    """Primitive routine for reading age and sex specification such as "30 male".
-    This is very crude. This is because reading answers to simple questions is not the main scope of this
-    example. In real chatbots, either use some real intent+slot recogniser such as snips_nlu,
-    or at least write a number of regular expressions to capture most typical patterns for a given language.
-    Also, age below 12 should be rejected as our current knowledge doesn't support paediatrics
-    (it's being developed but not delivered yet)."""
-    agesex = read_input('Patient age and sex (e.g., 30 male)')
-    age, sex = agesex.split()
-    return int(age), sex_norm[sex.lower()]
+    """Reads age and sex specification such as "30 male".
+
+    This is very crude. This is because reading answers to simple questions is
+    not the main scope of this example. In real chatbots, either use some real
+    intent+slot recogniser such as snips_nlu, or at least write a number of
+    regular expressions to capture most typical patterns for a given language.
+    Also, age below 12 should be rejected as our current knowledge doesn't
+    support paediatrics (it's being developed but not delivered yet).
+
+    Returns:
+        int, str: Tuple of age and sex.
+
+    """
+    agesex = read_input("Patient age and sex (e.g., 30 male)")
+    try:
+        age, sex = agesex.split()
+        age = int(age)
+        sex = sex_norm[sex]
+        if age < 12:
+            print("Ages below 12 are not yet handled.", end=' ')
+            raise ValueError
+        if age > 130:
+            print("Maximum possible age is 130.", end=' ')
+            raise ValueError
+    except (ValueError, KeyError):
+        print("Invalid input. Please reenter.")
+        age, sex = read_age_sex()
+    return age, sex
 
 
 def read_complaint_portion(auth_string, case_id, context, language_model=None):

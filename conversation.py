@@ -5,6 +5,10 @@ import apiaccess
 import constants
 
 
+class AmbiguousAnswerException(Exception):
+    pass
+
+
 def read_input(prompt):
     """Displays appropriate prompt and reads the input.
 
@@ -37,20 +41,17 @@ def read_age_sex():
         int, str: Age and sex.
 
     """
-    agesex = read_input("Patient age and sex (e.g., 30 male)")
+    answer = read_input("Patient age and sex (e.g., 30 male)")
     try:
-        age, sex = agesex.split()
-        age = int(age)
-        sex = constants.SEX_NORM[sex.lower()]
+        age = int(extract_age(answer))
+        sex = extract_sex(answer, constants.SEX_NORM)
         if age < constants.MIN_AGE:
-            print("Ages below 12 are not yet supported.", end=' ')
-            raise ValueError
+            raise ValueError("Ages below 12 are not yet supported.")
         if age > constants.MAX_AGE:
-            print("Maximum possible age is 130.", end=' ')
-            raise ValueError
-    except (ValueError, KeyError):
-        print("Invalid input, Please reenter.")
-        age, sex = read_age_sex()
+            raise ValueError("Maximum possible age is 130.")
+    except (AmbiguousAnswerException, ValueError) as e:
+        print("{} Please repeat.".format(e))
+        return read_age_sex()
     return age, sex
 
 
@@ -141,7 +142,12 @@ def read_single_question_answer(question_text):
     answer = read_input(question_text)
     if not answer:
         return None
-    return constants.ANSWER_NORM[answer]
+
+    try:
+        return extract_decision(answer, constants.ANSWER_NORM)
+    except (AmbiguousAnswerException, ValueError) as e:
+        print("{} Please repeat.".format(e))
+        return read_single_question_answer(question_text)
 
 
 def conduct_interview(evidence, age, sex, case_id, auth, language_model=None):
@@ -172,7 +178,7 @@ def conduct_interview(evidence, age, sex, case_id, auth, language_model=None):
             observation_value = read_single_question_answer(
                 question_text=question_struct['text'])
             if observation_value is not None:
-                new_evidence.append(apiaccess.question_answer_to_evidence(
+                new_evidence.extend(apiaccess.question_answer_to_evidence(
                     question_item, observation_value))
         else:
             # You'd need a rich UI to handle group questions gracefully.
@@ -227,7 +233,18 @@ def summarise_triage(triage_resp):
     print()
 
 
-def extract_intentions(text, mapping=constants.ANSWER_NORM):
+def extract_keywords(text, keywords):
+    """Extracts keywords from given text."""
+    # Construct an alternative regex pattern for each keyword (speeds up the
+    # search). Note that keywords must me escaped as they could potentialy
+    # contain regex-specific symbols, e.g. ?, *.
+    pattern = r"|".join(r"\b{}\b".format(re.escape(keyword))
+                        for keyword in keywords)
+    mentions_regex = re.compile(pattern, flags=re.I)
+    return mentions_regex.findall(text)
+
+
+def extract_intentions(text, mapping):
     """Extracts intent from given text.
 
     This is a slightly more advanced intent recognition (but still basic),
@@ -239,18 +256,41 @@ def extract_intentions(text, mapping=constants.ANSWER_NORM):
 
     Args:
         text (str): Text to analyzed.
-        mapping (dict, optional): Mapping from keyword to intent. Defaults to
-            constants.ANSWER_NORM.
+        mapping (dict): Mapping from keyword to intent.
 
     Returns:
         list: Found intents. One for each found keyword.
 
     """
-    # Construct an alternative regex pattern for each keyword (speeds up the
-    # search). Note that keywords must me escaped as they could potentialy
-    # contain regex-specific symbols, e.g. ?, *.
-    pattern = r"|".join(r"\b{}\b".format(re.escape(keyword))
-                        for keyword in mapping.keys())
-    mentions_regex = re.compile(pattern, flags=re.I)
-    found_keywords = mentions_regex.findall(text)
+    keywords = extract_keywords(text, mapping.keys())
     return [mapping[found.lower()] for found in found_keywords]
+
+
+def extract_decision(text, mapping):
+    decision_keywrods = set(extract_keywords(text, mapping.keys()))
+    if len(decision_keywrods) == 1:
+        return mapping[decision_keywrods.pop().lower()]
+    elif len(decision_keywrods) > 1:
+        raise AmbiguousAnswerException("The decision seemed ambiguous.")
+    else:
+        raise ValueError("No decision found.")
+
+
+def extract_sex(text, mapping):
+    sex_keywords = set(extract_keywords(text, mapping.keys()))
+    if len(sex_keywords) == 1:
+        return mapping[sex_keywords.pop().lower()]
+    elif len(sex_keywords) > 1:
+        raise AmbiguousAnswerException("I understood multiple sexes.")
+    else:
+        raise ValueError("No sex found.")
+
+
+def extract_age(text):
+    ages = set(re.findall(r"\b\d+\b", text))
+    if len(ages) == 1:
+        return ages.pop()
+    elif len(ages) > 1:
+        raise AmbiguousAnswerException("I understood multiple ages.")
+    else:
+        raise ValueError("No age found.")

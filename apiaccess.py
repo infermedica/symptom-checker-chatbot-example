@@ -157,6 +157,6 @@ def question_answer_to_evidence(question_struct_item, observation_value):
     question with the given observation value (status)."""
     # "initial" evidence comes from user's complaints
     # other evidence should be marked as "initial": False
-    return {'id': question_struct_item['id'],
-            'choice_id': observation_value,
-            'initial': False}
+    return [{'id': question_struct_item['id'],
+             'choice_id': observation_value,
+             'initial': False}]

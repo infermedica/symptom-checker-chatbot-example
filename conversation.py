@@ -1,3 +1,4 @@
+import re
 import sys
 
 import apiaccess
@@ -224,3 +225,32 @@ def summarise_triage(triage_resp):
         print('Teleconsultation applicable: {}'
               .format(teleconsultation_applicable))
     print()
+
+
+def extract_intentions(text, mapping=constants.ANSWER_NORM):
+    """Extracts intent from given text.
+
+    This is a slightly more advanced intent recognition (but still basic),
+    which matches regular expression for each word in dictionary and then
+    projects them onto possible intents.
+
+    Note:
+        The match is case insensitive.
+
+    Args:
+        text (str): Text to analyzed.
+        mapping (dict, optional): Mapping from keyword to intent. Defaults to
+            constants.ANSWER_NORM.
+
+    Returns:
+        list: Found intents. One for each found keyword.
+
+    """
+    # Construct an alternative regex pattern for each keyword (speeds up the
+    # search). Note that keywords must me escaped as they could potentialy
+    # contain regex-specific symbols, e.g. ?, *.
+    pattern = r"|".join(r"\b{}\b".format(re.escape(keyword))
+                        for keyword in mapping.keys())
+    mentions_regex = re.compile(pattern, flags=re.I)
+    found_keywords = mentions_regex.findall(text)
+    return [mapping[found.lower()] for found in found_keywords]

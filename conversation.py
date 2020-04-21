@@ -5,7 +5,7 @@ import constants
 
 
 def read_input(prompt):
-    """Displays appropriate prompt and read the input.
+    """Displays appropriate prompt and reads the input.
 
     Args:
         prompt (str): String to be displayed.
@@ -76,7 +76,7 @@ def read_complaint_portion(auth_string, case_id, context, language_model=None):
 
 
 def mention_as_text(mention):
-    """Represent the given mention structure as simple textual summary.
+    """Represents the given mention structure as simple textual summary.
 
     Args:
         mention (dict): Response containing information about medical concept.
@@ -111,6 +111,9 @@ def read_complaints(auth_string, case_id, language_model=None):
         auth_string (str): Authentication string.
         case_id (str): Case ID.
         lanugage_model (str): Chosen language model.
+
+    Returns:
+        list: Mentions extracted from user answers.
 
     """
     mentions = []
@@ -168,20 +171,24 @@ def conduct_interview(evidence, age, sex, case_id, auth, language_model=None):
             observation_value = read_single_question_answer(
                 question_text=question_struct['text'])
             if observation_value is not None:
-                new_evidence.extend(apiaccess.question_answer_to_evidence(
+                new_evidence.append(apiaccess.question_answer_to_evidence(
                     question_item, observation_value))
         else:
             # You'd need a rich UI to handle group questions gracefully.
-            # There are two types of group questions: "group_single" (radio buttons)
-            # and "group_multiple" (a bunch of single questions gathered under one caption).
-            # Actually you can try asking sequentially for each question item from "group_multiple" question
-            # and then adding the evidence coming from all these answers.
-            # For "group_single" there should be only one present answer. It's recommended to include only this chosen
-            # answer as present symptom in the new evidence.
-            # For more details, please consult:
+            # There are two types of group questions: "group_single" (radio
+            # buttons) and "group_multiple" (a bunch of single questions
+            # gathered under one caption). Actually you can try asking
+            # sequentially for each question item from "group_multiple"
+            # question and then adding the evidence coming from all these
+            # answers. For "group_single" there should be only one present
+            # answer. It's recommended to include only this chosen answer as
+            # present symptom in the new evidence. For more details, please
+            # consult:
             # https://developer.infermedica.com/docs/diagnosis#group_single
-            raise NotImplementedError('Group questions not handled in this example')
-        # important: always update the evidence gathered so far with the new answers
+            raise NotImplementedError("Group questions not handled in this"
+                                      "example")
+        # Important: always update the evidence gathered so far with the new
+        # answers
         evidence.extend(new_evidence)
 
 
@@ -204,13 +211,16 @@ def summarise_all_evidence(evidence):
 def summarise_diagnoses(diagnoses):
     print('Diagnoses:')
     for idx, diag in enumerate(diagnoses):
-        print('{:2}. {:.2f} {}'.format(idx + 1, diag['probability'], diag['name']))
+        print('{:2}. {:.2f} {}'.format(idx + 1, diag['probability'],
+                                       diag['name']))
     print()
 
 
 def summarise_triage(triage_resp):
     print('Triage level: {}'.format(triage_resp['triage_level']))
-    teleconsultation_applicable = triage_resp.get('teleconsultation_applicable')
+    teleconsultation_applicable = triage_resp.get(
+        'teleconsultation_applicable')
     if teleconsultation_applicable is not None:
-        print('Teleconsultation applicable: {}'.format(teleconsultation_applicable))
+        print('Teleconsultation applicable: {}'
+              .format(teleconsultation_applicable))
     print()

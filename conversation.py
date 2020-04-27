@@ -234,7 +234,16 @@ def summarise_triage(triage_resp):
 
 
 def extract_keywords(text, keywords):
-    """Extracts keywords from given text."""
+    """Extracts keywords from text.
+
+    Args:
+        text (str): Text from which the keywords will be extracted.
+        keywords (list): Keywords to look for.
+
+    Returns:
+        list: All keywords found in text.
+
+    """
     # Construct an alternative regex pattern for each keyword (speeds up the
     # search). Note that keywords must me escaped as they could potentialy
     # contain regex-specific symbols, e.g. ?, *.
@@ -244,29 +253,22 @@ def extract_keywords(text, keywords):
     return mentions_regex.findall(text)
 
 
-def extract_intentions(text, mapping):
-    """Extracts intent from given text.
-
-    This is a slightly more advanced intent recognition (but still basic),
-    which matches regular expression for each word in dictionary and then
-    projects them onto possible intents.
-
-    Note:
-        The match is case insensitive.
+def extract_decision(text, mapping):
+    """Extracts decision keywords from text.
 
     Args:
-        text (str): Text to analyzed.
-        mapping (dict): Mapping from keyword to intent.
+        text (str): Text from which the keywords will be extracted.
+        mapping (dict): Mapping from keyword to decision.
 
     Returns:
-        list: Found intents. One for each found keyword.
+        str: Single decision (one of `mapping` values).
+
+    Raises:
+        AmbiguousAnswerException: If `text` contains keywords mapping to two
+            or more different distinct decision.
+        ValueError: If no keywords can be found in `text`.
 
     """
-    keywords = extract_keywords(text, mapping.keys())
-    return [mapping[found.lower()] for found in found_keywords]
-
-
-def extract_decision(text, mapping):
     decision_keywrods = set(extract_keywords(text, mapping.keys()))
     if len(decision_keywrods) == 1:
         return mapping[decision_keywrods.pop().lower()]
@@ -277,6 +279,21 @@ def extract_decision(text, mapping):
 
 
 def extract_sex(text, mapping):
+    """Extracts sex keywords from text.
+
+    Args:
+        text (str): Text from which the keywords will be extracted.
+        mapping (dict): Mapping from keyword to sex.
+
+    Returns:
+        str: Single decision (one of `mapping` values).
+
+    Raises:
+        AmbiguousAnswerException: If `text` contains keywords mapping to two
+            or more different distinct sexes.
+        ValueError: If no keywords can be found in `text`.
+
+    """
     sex_keywords = set(extract_keywords(text, mapping.keys()))
     if len(sex_keywords) == 1:
         return mapping[sex_keywords.pop().lower()]
@@ -287,6 +304,19 @@ def extract_sex(text, mapping):
 
 
 def extract_age(text):
+    """Extracts age from text.
+
+    Args:
+        text (str): Text from which the keywords will be extracted.
+
+    Returns:
+        str: Found number (as a string).
+
+    Raises:
+        AmbiguousAnswerException: If `text` contains two or more numbers.
+        ValueError: If no numbers can be found in `text`.
+
+    """
     ages = set(re.findall(r"\b\d+\b", text))
     if len(ages) == 1:
         return ages.pop()

@@ -55,15 +55,17 @@ def read_age_sex():
     return age, sex
 
 
-def read_complaint_portion(auth_string, case_id, context, language_model=None):
+def read_complaint_portion(age, sex, auth_string, case_id, context, language_model=None):
     """Reads user input and calls the /parse endpoint of Infermedica API to
     extract conditions found in text.
 
     Args:
+        age (dict): Patients age in {'value': int, 'unit': str} format.
+        sex (str): Patients sex.
         auth_string (str): Authentication string.
         case_id (str): Case ID.
         context (list): List previous complaints.
-        lanugage_model (str): Chosen language model.
+        language_model (str): Chosen language model.
 
     Returns:
         dict: Response from /parse endpoint.
@@ -72,7 +74,7 @@ def read_complaint_portion(auth_string, case_id, context, language_model=None):
     text = read_input('Describe you complaints')
     if not text:
         return None
-    resp = apiaccess.call_parse(text, auth_string, case_id, context,
+    resp = apiaccess.call_parse(age, sex, text, auth_string, case_id, context,
                                 language_model=language_model)
     return resp.get('mentions', [])
 
@@ -104,12 +106,14 @@ def summarise_mentions(mentions):
     print("Noting: {}".format(", ".join(mention_as_text(m) for m in mentions)))
 
 
-def read_complaints(auth_string, case_id, language_model=None):
+def read_complaints(age, sex, auth_string, case_id, language_model=None):
     """Keeps reading complaint-describing messages from user until empty
     message is read (or just read the story if given). Will call the /parse
     endpoint and return mentions captured there.
 
     Args:
+        age (dict): Patients age in {'value': int, 'unit': str} format.
+        sex (str): Patients sex.
         auth_string (str): Authentication string.
         case_id (str): Case ID.
         lanugage_model (str): Chosen language model.
@@ -121,7 +125,7 @@ def read_complaints(auth_string, case_id, language_model=None):
     mentions = []
     context = []  # List of ids of present symptoms in the order of reporting.
     while True:
-        portion = read_complaint_portion(auth_string, case_id, context,
+        portion = read_complaint_portion(age, sex, auth_string, case_id, context,
                                          language_model=language_model)
         if portion:
             summarise_mentions(portion)

@@ -1,7 +1,7 @@
 import requests
 
 
-infermedica_url = 'https://api.infermedica.com/v2/{}'
+infermedica_url = 'https://api.infermedica.com/v3/{}'
 
 
 def _remote_headers(auth_string, case_id, language_model=None):
@@ -17,7 +17,30 @@ def _remote_headers(auth_string, case_id, language_model=None):
     return headers
 
 
-def call_endpoint(endpoint, auth_string, request_spec, case_id,
+def _flatten_params_dict(to_flatten, parent_key=''):
+    """Returns flattened dict with concatenated keys separated by dot
+
+    Args:
+        to_flatten (dict | None)
+
+    Returns:
+        dict | None: flattened dict, or None if given `to_flatten` is None
+    """
+    if to_flatten is None:
+        return None
+
+    items = []
+    sep = '.'
+    for key, value in to_flatten.items():
+        new_key = parent_key + sep + key if parent_key else key
+        if isinstance(value, dict):
+            items.extend(_flatten_params_dict(value, new_key).items())
+        else:
+            items.append((new_key, value))
+    return dict(items)
+
+
+def call_endpoint(endpoint, auth_string, params, request_spec, case_id,
                   language_model=None):
     if auth_string and ':' in auth_string:
         url = infermedica_url.format(endpoint)
@@ -37,10 +60,14 @@ def call_endpoint(endpoint, auth_string, request_spec, case_id,
     if request_spec:
         resp = requests.post(
             url,
+            params=_flatten_params_dict(params),
             json=request_spec,
             headers=headers)
     else:
-        resp = requests.get(url, headers=headers)
+        resp = requests.get(
+            url,
+            params=_flatten_params_dict(params),
+            headers=headers)
     resp.raise_for_status()
     return resp.json()
 
@@ -65,15 +92,11 @@ def call_diagnosis(evidence, age, sex, case_id, auth_string, no_groups=True,
         'sex': sex,
         'evidence': evidence,
         'extras': {
-            # this is to avoid very improbable diagnoses at output and ensure
-            # there are no more than 8 results recommended to use for virtually
-            # any app, this should become the default mode soon
-            'enable_adaptive_ranking': True,
             # voice/chat apps usually can't handle group questions well
             'disable_groups': no_groups
         }
     }
-    return call_endpoint('diagnosis', auth_string, request_spec, case_id,
+    return call_endpoint('diagnosis', auth_string, None, request_spec, case_id,
                          language_model)
 
 
@@ -94,17 +117,13 @@ def call_triage(evidence, age, sex, case_id, auth_string, language_model=None):
     request_spec = {
         'age': age,
         'sex': sex,
-        'evidence': evidence,
-        'extras': {
-            # this is to turn on the 5-lvl triage (recommended in the API docs)
-            'enable_triage_5': True,
-        }
+        'evidence': evidence
     }
-    return call_endpoint('triage', auth_string, request_spec, case_id,
+    return call_endpoint('triage', auth_string, None, request_spec, case_id,
                          language_model)
 
 
-def call_parse(text, auth_string, case_id, context=(),
+def call_parse(age, sex, text, auth_string, case_id, context=(),
                conc_types=('symptom', 'risk_factor',), language_model=None):
     """Process the user message (text) via Infermedica NLP API (/parse) to 
     capture observations mentioned there. Return a list of dicts, each of them
@@ -116,13 +135,19 @@ def call_parse(text, auth_string, case_id, context=(),
     far, in the order of reporting. 
     See https://developer.infermedica.com/docs/nlp ("contextual clues").
     """
-    request_spec = {'text': text, 'context': list(context),
-                    'include_tokens': True, 'concept_types': conc_types}
-    return call_endpoint('parse', auth_string, request_spec, case_id,
+    request_spec = {
+       'age': age,
+       'sex': sex,
+       'text': text,
+       'context': list(context),
+       'include_tokens': True,
+       'concept_types': conc_types,
+       }
+    return call_endpoint('parse', auth_string, None, request_spec, case_id,
                          language_model=language_model)
 
 
-def get_observation_names(auth_string, case_id, language_model=None):
+def get_observation_names(age, auth_string, case_id, language_model=None):
     """Call /symptoms and /risk_factors to obtain full lists of all symptoms
     and risk factors along with their metadata. Those metadata include names
     and this is what we're after. Observations may contain both symptoms and
@@ -130,10 +155,10 @@ def get_observation_names(auth_string, case_id, language_model=None):
     risk factors -- p_)."""
     obs_structs = []
     obs_structs.extend(
-        call_endpoint('risk_factors', auth_string, None, case_id=case_id,
+        call_endpoint('risk_factors', auth_string, {'age': age}, None, case_id=case_id,
                       language_model=language_model))
     obs_structs.extend(
-        call_endpoint('symptoms', auth_string, None, case_id=case_id,
+        call_endpoint('symptoms', auth_string, {'age': age}, None, case_id=case_id,
                       language_model=language_model))
     return {struct['id']: struct['name'] for struct in obs_structs}
 
@@ -148,15 +173,12 @@ def mentions_to_evidence(mentions):
     """Convert mentions (from /parse endpoint) to evidence structure as
     expected by the /diagnosis endpoint.
     """
-    return [{'id': m['id'], 'choice_id': m['choice_id'], 'initial': True}
+    return [{'id': m['id'], 'choice_id': m['choice_id'], 'source': 'initial'}
             for m in mentions]
 
 
 def question_answer_to_evidence(question_struct_item, observation_value):
     """Return new evidence obtained via abswering the one item contained in a
     question with the given observation value (status)."""
-    # "initial" evidence comes from user's complaints
-    # other evidence should be marked as "initial": False
     return [{'id': question_struct_item['id'],
-             'choice_id': observation_value,
-             'initial': False}]
+             'choice_id': observation_value}]

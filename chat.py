@@ -89,18 +89,19 @@ def run():
     auth_string = get_auth_string(args.auth)
     case_id = new_case_id()
 
-    # Query for all observation names and store them. In a real chatbot, this
-    # could be done once at initialisation and used for handling all events by
-    # one worker. This is an id2name mapping.
-    naming = apiaccess.get_observation_names(auth_string, case_id, args.model)
-
     # Read patient's age and sex; required by /diagnosis endpoint.
     # Alternatively, this could be done after learning patient's complaints
     age, sex = conversation.read_age_sex()
     print(f"Ok, {age} year old {sex}.")
+    age = {'value':  age, 'unit': 'year'}
+
+    # Query for all observation names and store them. In a real chatbot, this
+    # could be done once at initialisation and used for handling all events by
+    # one worker. This is an id2name mapping.
+    naming = apiaccess.get_observation_names(age, auth_string, case_id, args.model)
 
     # Read patient's complaints by using /parse endpoint.
-    mentions = conversation.read_complaints(auth_string, case_id, args.model)
+    mentions = conversation.read_complaints(age, sex, auth_string, case_id, args.model)
 
     # Keep asking diagnostic questions until stop condition is met (all of this
     # by calling /diagnosis endpoint) and get the diagnostic ranking and triage

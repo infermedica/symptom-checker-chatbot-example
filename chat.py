@@ -65,8 +65,6 @@ def parse_args():
         argparse.Namespace: Namespace containing three public attributes:
             1. auth (str) - authentication credentials.
             2. model (str) - chosen language model.
-            3. verbose (bool) - flag indicating verbose output.
-
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("auth",
@@ -75,10 +73,6 @@ def parse_args():
     parser.add_argument("--model",
                         help="use non-standard Infermedica model/language, "
                              "e.g. infermedica-es")
-    # TODO: Check if `verbose` actually does anything.
-    parser.add_argument("-v", "--verbose",
-                        dest="verbose", action="store_true", default=False,
-                        help="dump internal state")
     args = parser.parse_args()
     return args
 

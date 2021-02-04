@@ -29,15 +29,15 @@ def _flatten_params_dict(to_flatten, parent_key=''):
     if to_flatten is None:
         return None
 
-    items = []
+    items = {}
     sep = '.'
     for key, value in to_flatten.items():
         new_key = parent_key + sep + key if parent_key else key
         if isinstance(value, dict):
-            items.extend(_flatten_params_dict(value, new_key).items())
+            items.update(_flatten_params_dict(value, new_key))
         else:
-            items.append((new_key, value))
-    return dict(items)
+            items[new_key] = value
+    return items
 
 
 def call_endpoint(endpoint, auth_string, params, request_spec, case_id,

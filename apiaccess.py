@@ -17,29 +17,6 @@ def _remote_headers(auth_string, case_id, language_model=None):
     return headers
 
 
-def _flatten_params_dict(to_flatten, parent_key=''):
-    """Returns flattened dict with concatenated keys separated by dot
-
-    Args:
-        to_flatten (dict | None)
-
-    Returns:
-        dict | None: flattened dict, or None if given `to_flatten` is None
-    """
-    if to_flatten is None:
-        return None
-
-    items = {}
-    sep = '.'
-    for key, value in to_flatten.items():
-        new_key = parent_key + sep + key if parent_key else key
-        if isinstance(value, dict):
-            items.update(_flatten_params_dict(value, new_key))
-        else:
-            items[new_key] = value
-    return items
-
-
 def call_endpoint(endpoint, auth_string, params, request_spec, case_id,
                   language_model=None):
     if auth_string and ':' in auth_string:
@@ -60,13 +37,13 @@ def call_endpoint(endpoint, auth_string, params, request_spec, case_id,
     if request_spec:
         resp = requests.post(
             url,
-            params=_flatten_params_dict(params),
+            params=params,
             json=request_spec,
             headers=headers)
     else:
         resp = requests.get(
             url,
-            params=_flatten_params_dict(params),
+            params=params,
             headers=headers)
     resp.raise_for_status()
     return resp.json()
@@ -155,11 +132,13 @@ def get_observation_names(age, auth_string, case_id, language_model=None):
     risk factors -- p_)."""
     obs_structs = []
     obs_structs.extend(
-        call_endpoint('risk_factors', auth_string, {'age': age}, None, case_id=case_id,
-                      language_model=language_model))
+        call_endpoint('risk_factors', auth_string,
+                      {'age.value': age['value'], 'age.unit': age['unit']},
+                      None, case_id=case_id, language_model=language_model))
     obs_structs.extend(
-        call_endpoint('symptoms', auth_string, {'age': age}, None, case_id=case_id,
-                      language_model=language_model))
+        call_endpoint('symptoms', auth_string,
+                      {'age.value': age['value'], 'age.unit': age['unit']},
+                      None, case_id=case_id, language_model=language_model))
     return {struct['id']: struct['name'] for struct in obs_structs}
 
 

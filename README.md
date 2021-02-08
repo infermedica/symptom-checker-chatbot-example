@@ -63,11 +63,10 @@ See [an example session](example_session.txt).
  but in the long run you should consider using open-source tools such as _Snips NLU_ or _RASA NLU_.
  This would also allow you to understand parameters such as age and sex (via _slots_ of _intents_).
 
- 3. **Custom flow**. You must know the user's age and sex before calling `/diagnosis`.
- But you're free to choose if you want to read complaints first or age and sex.
- Any case of age below 12 years old should be rejected as the Infermedica's engine does not cover paediatrics yet
- (at the moment of writing).
- For legal reasons you may need to use higher age threshold, though.
+ 3. **Custom flow**. The Infermedica engine requires that you must learn the user's age and sex first,
+ then the chief complaints and then you can proceed to the diagnostic questions.
+ Still, you can decide what happens before that and after that. Also, not all pieces of available
+ information must be presented.
  Also, you can consider an option to allow the user to add complaints later on during the interview (if the user
  explicitly wants to add something instead of responding to the last question).
  

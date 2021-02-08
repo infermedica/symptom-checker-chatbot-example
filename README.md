@@ -7,6 +7,9 @@ The project is merely a tutorial. It's not intended to be a production-ready sol
 The entire interaction takes place in console. No intent recognition is performed and the bot is pretty ignorant
 when it comes to understanding user's actions other than blindly following the instructions.
 
+If you intend on writing your chatbot in Python, we strongly recommed using our offical 
+[Python API client](https://github.com/infermedica/python-api).
+
 ## How to run the example
 
 You'll need an Infermedica account. If you don't have one, please register at https://developer.infermedica.com.
